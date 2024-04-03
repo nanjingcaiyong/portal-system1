@@ -1,5 +1,4 @@
 <template>
-  {{ token }}
   <router-view></router-view>
 </template>
 

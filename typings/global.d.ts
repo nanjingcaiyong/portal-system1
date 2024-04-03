@@ -1,25 +1,42 @@
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 
-import { AxiosRequestConfig } from 'axios';
-import { UnwrapNestedRefs } from 'vue';
 import { Router } from 'vue-router';
+import { UnwrapNestedRefs } from 'vue';
+import { AxiosRequestConfig } from 'axios';
+
+type Method = 'get'| 'delete'| 'post'| 'put'| 'cancelGet' | 'cancelPost';
 
 declare global {
-  interface Window { 
-    [key: string]: any
+  interface Window {
+    router: {
+      [key: string]: any
+    }
   }
-
-
-  type $t = {
-    [key: string]: string
-  }
+  type createStore = <T>(target: T) => UnwrapNestedRefs<T>
 
   const router: Router
 
-  type createStore = <T>(target: T) => UnwrapNestedRefs<T>
+  type API = {
+    AUTH: {
+      [key: string]: <T>(params: any, resetConfig?: AxiosRequestConfig ) => Promise<T>
+    },
+    MENU: {
+      [key: string]: <T>(params?: any, resetConfig?: AxiosRequestConfig ) => Promise<T>
+    }
+  }
 
-  var __webpack_public_path__: string
+  const $API: API
+
+ type ApiConfig = {
+    name: string,
+    path: string,
+    type: Method,
+    moduleName?: string
+  }
 }
+
+
+
 declare module 'axios' {
   export interface AxiosInstance {
     [key: string]: any;
