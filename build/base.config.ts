@@ -8,7 +8,7 @@ import legacy from '@vitejs/plugin-legacy';
 import inject from '@rollup/plugin-inject';
 import path from 'path';
 import { Plugin, UserConfig } from 'vite';
-import { legacyQiankun } from 'vite-plugin-legacy-qiankun'
+import { legacyQiankun } from 'vite-plugin-legacy-qiankun';
 
 const resolve = (filePath: string) => path.resolve(__dirname, filePath);
 const API_ENTRY_PATH = resolve('../src/apis/index.ts')

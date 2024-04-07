@@ -1,5 +1,5 @@
 <template>
-  <a-form>
+  <a-form class="home">
     <a-row :gutter="48" >
       <a-col :md="8" :sm="24">
         <a-form-item label="规则编号">
@@ -35,22 +35,46 @@
     </a-row>
   </a-form>
   <div class="mb-[18px]">
-    <a-button type="primary"><PlusOutlined/>新增</a-button>
+    <a-button type="primary" @click="onAddMenuItem"><PlusOutlined/>新增</a-button>
   </div>
-  <div class="mb-[16px]">
-    <a-alert type="info" :showIcon="true" class="flex items-center px-[8px]" >
-      <template #message>
-        <span style="margin-right: 12px">
-          已选择： <a class="text-[#1890ff]">2</a> 项
-        </span>
-        <span>服务调用次数总计： <a class="text-[#1890ff]"> 222  </a> 次</span>
+  <a-table :dataSource="store.dataSource" :columns="store.columns" :custom-row="customRow">
+    <template #bodyCell="{ column, record, index }">
+      <template v-if="column.key === 'description'">
+        <a-input v-model:value="record.description" v-if="record.isEdit"></a-input>
+        <span v-else>{{ record.description }}</span>
       </template>
-    </a-alert>
-  </div>
-  <a-table :dataSource="store.dataSource" :columns="store.columns" :custom-row="store.customRow">
-    <template #bodyCell="{ column, record }">
+      <template v-if="column.key === 'menuName'">
+        <a-input v-model:value="record.menuName" v-if="record.isEdit"></a-input>
+        <span v-else>{{ record.menuName }}</span>
+      </template>
+      <template v-if="column.key === 'path'">
+        <a-input v-model:value="record.path" v-if="record.isEdit"></a-input>
+        <span v-else>{{ record.path }}</span>
+      </template>
+      <template v-if="column.key === 'updateAt'">
+        <span>{{ record.updateAt }}</span>
+      </template>
       <template v-if="column.key === 'operation'">
-        <a-button danger>删除</a-button>
+        <a-span v-if="record.isEdit">
+          <a-button type="primary" @click="onSave">保存</a-button>
+        </a-span>
+        <a-space v-else>
+          <a-button @click="onAddSubMenuItem(record.id)" >新增</a-button>
+          <a-button>编辑</a-button>
+          <a-popover v-model:open="record.deleteModalState" title="是否确认删除" trigger="click">
+            <template #content>
+              <a-row justify="space-between" class="w-[130px]">
+                <a-col>
+                  <a-button @click="record.deleteModalState = false">否</a-button>
+                </a-col>
+                <a-col>
+                  <a-button danger @click="onDeleteMenuItem(record)">是</a-button>
+                </a-col>
+              </a-row>
+            </template>
+            <a-button danger @click="record.deleteModalState = true">删除</a-button>
+          </a-popover>
+        </a-space>
       </template>
     </template>
   </a-table>
@@ -58,67 +82,107 @@
 <script lang="ts" setup>
 import { reactive } from 'vue';
 import {UpOutlined, DownOutlined, PlusOutlined, ExclamationCircleOutlined } from '@ant-design/icons-vue';
-const store = reactive({
+import type { TableColumnType } from 'ant-design-vue';
+import { message } from 'ant-design-vue';
+import columns from './columns'
+const defaultRow = {
+  menuName: '',
+  description: '',
+  pid: 0,
+  type: 0,
+  isEdit: true,
+  creator: ''
+}
+const store = reactive<{
+  dataSource: Menu[],
+  advanced: boolean,
+  columns: TableColumnType[],
+  deleteModalState: boolean
+}>({
   advanced: false,
-  sourceCode: '', // 源目标code
-  targetCode: '', // 目标code
-  customRow: (record: any, index: number) => {
-
-    return {
-      // 添加拖动处理函数
-      draggable: true,
-      onDragstart: (event: any) => {
-        event.dataTransfer.setData('index', index);
-      },
-      onDragover: (event: Event) => {
-        event.preventDefault();
-      },
-      onDrop: (event: DragEvent) => {
-        event.preventDefault();
-        const firstMenu = store.dataSource.find((menu:any) => menu.id === record.pid) as any;
-        const fromIndex = parseInt(event.dataTransfer?.getData?.('index') || '0');
-        const toIndex = index;
-        // 重新排列数据源中的行顺序
-        const newData = firstMenu?.children;
-        const item = newData.splice(fromIndex - 1, 1)[0];
-        newData.splice(toIndex - 1, 0, item);
-        firstMenu.children = newData;
-      }
-    }
-  },
-  columns: [{
-    title: '序号',
-    dataIndex: 'id',
-    key: 'id',
-    width: 150
-  }, {
-    title: '菜单名称',
-    dataIndex: 'menuName',
-    key: 'menuName',
-    width: 200
-  }, {
-    title: '描述',
-    dataIndex: 'description',
-    key: 'description',
-    width: 500
-  }, {
-    title: '更新时间',
-    dataIndex: 'updated_at',
-    key: 'updated_at',
-    width: 200
-  }, {
-    title: '操作',
-    key: 'operation',
-    fixed: 'right',
-    width: 100
-  }],
-  dataSource: []
+  columns: columns,
+  dataSource: [],
+  deleteModalState: false
 })
 
+const customRow = (record: any, index: number) => {
+  return {
+    // 添加拖动处理函数
+    draggable: true,
+    onDragstart: (event: any) => {
+      event.dataTransfer.setData('index', index);
+    },
+    onDragover: (event: Event) => {
+      event.preventDefault();
+    },
+    onDrop: (event: DragEvent) => {
+      event.preventDefault();
+      const firstMenu = store.dataSource.find((menu:any) => menu.id === record.pid) as any;
+      const fromIndex = parseInt(event.dataTransfer?.getData?.('index') || '0');
+      const toIndex = index;
+      // 重新排列数据源中的行顺序
+      const newData = firstMenu?.children;
+      const item = newData.splice(fromIndex - 1, 1)[0];
+      newData.splice(toIndex - 1, 0, item);
+      firstMenu.children = newData;
+    }
+  }
+}
+
 const main = async () => {
-  const res = await $API.MENU.queryList<any>();
+  const res = await $API.MENU.queryList<MenuModal>();
   if (res.success && res.data.length) {
     store.dataSource = res.data
+  }
+}
+
+/**
+ * @description 新增数据
+ */
+const onAddMenuItem = () => {
+  store.dataSource.unshift(JSON.parse(JSON.stringify(defaultRow)))
+}
+
+const onAddSubMenuItem = (pid: number) => {
+  const menuItem = store.dataSource.find(menu => menu.id === pid)
+  menuItem.children.unshift(JSON.parse(JSON.stringify(Object.assign(defaultRow, {pid, type: 1}))))
+}
+
+/**
+ * @description 删除菜单项
+ * @param record 菜单数据
+ */
+const onDeleteMenuItem = async (record: Menu) => {
+  const res = await $API.MENU.delete({id: record.id}) as any;
+  if (res.success) {
+    record.deleteModalState = false;
+    message.success('删除成功');
+    main()
+  }
+}
+
+const onSave = async () => {
+  let i = -1, j = -1
+  let editMenu = undefined;
+  while(++i < store.dataSource.length) {
+    const menu = store.dataSource[i]
+    if (menu.isEdit) {
+      editMenu = menu;
+      delete menu.isEdit;
+    }
+    while(++j < menu.children?.length) {
+      let subMenu = menu.children[j]
+      if (subMenu.isEdit) {
+        editMenu = subMenu;
+        delete subMenu.isEdit;
+      }
+    }
+    if (editMenu) break;
+  }
+  const res = await $API.MENU.create<any>(editMenu);
+  if (res.success) {
+    message.success('新增成功')
+    main()
   }
 }
 
@@ -127,3 +191,10 @@ const toggleAdvanced = () => {
   store.advanced = !store.advanced
 }
 </script>
+
+
+<style>
+.ant-popover .ant-popover-title{
+  min-width: 100px;
+}
+</style>
