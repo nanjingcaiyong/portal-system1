@@ -37,7 +37,12 @@
   <div class="mb-[18px]">
     <a-button type="primary" @click="onAddMenuItem"><PlusOutlined/>新增</a-button>
   </div>
-  <a-table :dataSource="store.dataSource" :columns="store.columns" :custom-row="customRow">
+  <a-table 
+    :dataSource="store.dataSource" 
+    :columns="store.columns" 
+    :custom-row="customRow" 
+    v-model:expandedRowKeys="store.expandedRowKeys"
+  >
     <template #bodyCell="{ column, record, index }">
       <template v-if="column.key === 'description'">
         <a-input v-model:value="record.description" v-if="record.isEdit"></a-input>
@@ -52,28 +57,23 @@
         <span v-else>{{ record.path }}</span>
       </template>
       <template v-if="column.key === 'updateAt'">
-        <span>{{ record.updateAt }}</span>
+        <span>{{ moment(record.updateAt).format('YYYY/MM/DD HH:mm:ss') }}</span>
       </template>
       <template v-if="column.key === 'operation'">
         <a-span v-if="record.isEdit">
           <a-button type="primary" @click="onSave">保存</a-button>
         </a-span>
         <a-space v-else>
-          <a-button @click="onAddSubMenuItem(record.id)" >新增</a-button>
+          <a-button v-if="record.type === 0" @click="onAddSubMenuItem(record.id)" >新增</a-button>
           <a-button>编辑</a-button>
-          <a-popover v-model:open="record.deleteModalState" title="是否确认删除" trigger="click">
-            <template #content>
-              <a-row justify="space-between" class="w-[130px]">
-                <a-col>
-                  <a-button @click="record.deleteModalState = false">否</a-button>
-                </a-col>
-                <a-col>
-                  <a-button danger @click="onDeleteMenuItem(record)">是</a-button>
-                </a-col>
-              </a-row>
-            </template>
-            <a-button danger @click="record.deleteModalState = true">删除</a-button>
-          </a-popover>
+
+          <a-popconfirm
+            v-if="store.dataSource.length"
+            title="Sure to delete?"
+            @confirm="onDeleteMenuItem(record)"
+          >
+            <a-button danger>删除</a-button>
+          </a-popconfirm>
         </a-space>
       </template>
     </template>
@@ -85,6 +85,7 @@ import {UpOutlined, DownOutlined, PlusOutlined, ExclamationCircleOutlined } from
 import type { TableColumnType } from 'ant-design-vue';
 import { message } from 'ant-design-vue';
 import columns from './columns'
+import moment from 'moment'
 const defaultRow = {
   menuName: '',
   description: '',
@@ -97,12 +98,14 @@ const store = reactive<{
   dataSource: Menu[],
   advanced: boolean,
   columns: TableColumnType[],
-  deleteModalState: boolean
+  deleteModalState: boolean,
+  expandedRowKeys: number[]
 }>({
   advanced: false,
   columns: columns,
   dataSource: [],
-  deleteModalState: false
+  deleteModalState: false,
+  expandedRowKeys: []
 })
 
 const customRow = (record: any, index: number) => {
@@ -140,10 +143,12 @@ const main = async () => {
  * @description 新增数据
  */
 const onAddMenuItem = () => {
+  
   store.dataSource.unshift(JSON.parse(JSON.stringify(defaultRow)))
 }
 
 const onAddSubMenuItem = (pid: number) => {
+  store.expandedRowKeys.push(pid)
   const menuItem = store.dataSource.find(menu => menu.id === pid)
   menuItem.children.unshift(JSON.parse(JSON.stringify(Object.assign(defaultRow, {pid, type: 1}))))
 }
