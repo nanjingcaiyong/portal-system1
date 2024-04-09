@@ -41,35 +41,33 @@
     :dataSource="store.dataSource" 
     :columns="store.columns" 
     :custom-row="customRow" 
+    :defaultExpandedRowKeys="['1']"
     v-model:expandedRowKeys="store.expandedRowKeys"
+    row-key="id"
   >
     <template #bodyCell="{ column, record, index }">
-      <template v-if="column.key === 'description'">
-        <a-input v-model:value="record.description" v-if="record.isEdit"></a-input>
-        <span v-else>{{ record.description }}</span>
+
+      <template v-if="['menuName', 'path' ,'description', 'address'].includes(column.dataIndex)">
+        <a-input v-model:value="record[column.dataIndex]" v-if="record.isEdit"></a-input>
+        <span v-else>{{ record[column.dataIndex] }}</span>
       </template>
-      <template v-if="column.key === 'menuName'">
-        <a-input v-model:value="record.menuName" v-if="record.isEdit"></a-input>
-        <span v-else>{{ record.menuName }}</span>
-      </template>
-      <template v-if="column.key === 'path'">
-        <a-input v-model:value="record.path" v-if="record.isEdit"></a-input>
-        <span v-else>{{ record.path }}</span>
-      </template>
+
       <template v-if="column.key === 'updateAt'">
         <span>{{ moment(record.updateAt).format('YYYY/MM/DD HH:mm:ss') }}</span>
       </template>
       <template v-if="column.key === 'operation'">
-        <a-span v-if="record.isEdit">
-          <a-button type="primary" @click="onSave">保存</a-button>
-        </a-span>
+        <a-space v-if="record.isEdit">
+          <a-button type="primary" @click="onSave(record)">保存</a-button>
+          <a-button @click="onCancelEdit(index)">取消</a-button>
+        </a-space>
         <a-space v-else>
-          <a-button v-if="record.type === 0" @click="onAddSubMenuItem(record.id)" >新增</a-button>
-          <a-button>编辑</a-button>
-
+          <a-button v-if="record.type === 0" @click="onAddSubMenuItem(record)" >新增</a-button>
+          <a-button @click="onEdit(record)">编辑</a-button>
           <a-popconfirm
             v-if="store.dataSource.length"
-            title="Sure to delete?"
+            title="是否删除吗?"
+            ok-text="是" 
+            cancel-text="否"
             @confirm="onDeleteMenuItem(record)"
           >
             <a-button danger>删除</a-button>
@@ -80,12 +78,13 @@
   </a-table>
 </template>
 <script lang="ts" setup>
-import { reactive } from 'vue';
+import { UnwrapRef, reactive } from 'vue';
 import {UpOutlined, DownOutlined, PlusOutlined, ExclamationCircleOutlined } from '@ant-design/icons-vue';
 import type { TableColumnType } from 'ant-design-vue';
-import { message } from 'ant-design-vue';
-import columns from './columns'
-import moment from 'moment'
+import { Menu, message } from 'ant-design-vue';
+import columns from './columns';
+import moment from 'moment';
+import { cloneDeep } from 'lodash-es'
 const defaultRow = {
   menuName: '',
   description: '',
@@ -99,13 +98,15 @@ const store = reactive<{
   advanced: boolean,
   columns: TableColumnType[],
   deleteModalState: boolean,
-  expandedRowKeys: number[]
+  expandedRowKeys: number[],
+  editMenu?: Menu
 }>({
   advanced: false,
   columns: columns,
   dataSource: [],
   deleteModalState: false,
-  expandedRowKeys: []
+  expandedRowKeys: [],
+  editMenu: {}
 })
 
 const customRow = (record: any, index: number) => {
@@ -132,25 +133,22 @@ const customRow = (record: any, index: number) => {
   }
 }
 
-const main = async () => {
-  const res = await $API.MENU.queryList<MenuModal>();
-  if (res.success && res.data.length) {
-    store.dataSource = res.data
-  }
-}
-
 /**
- * @description 新增数据
+ * @description 新增系统
  */
 const onAddMenuItem = () => {
-  
   store.dataSource.unshift(JSON.parse(JSON.stringify(defaultRow)))
 }
 
-const onAddSubMenuItem = (pid: number) => {
-  store.expandedRowKeys.push(pid)
-  const menuItem = store.dataSource.find(menu => menu.id === pid)
-  menuItem.children.unshift(JSON.parse(JSON.stringify(Object.assign(defaultRow, {pid, type: 1}))))
+/**
+ * @description 新增子菜单
+ * @param pid 系统id
+ */
+const onAddSubMenuItem = (menu: Menu) => {
+  store.expandedRowKeys.push(menu.id);
+  debugger;
+  menu.children = menu.children || [];
+  menu.children.unshift(cloneDeep(Object.assign({}, defaultRow, {pid: menu.id, type: 1})));
 }
 
 /**
@@ -162,36 +160,74 @@ const onDeleteMenuItem = async (record: Menu) => {
   if (res.success) {
     record.deleteModalState = false;
     message.success('删除成功');
-    main()
+    queryList()
   }
 }
 
-const onSave = async () => {
-  let i = -1, j = -1
-  let editMenu = undefined;
-  while(++i < store.dataSource.length) {
-    const menu = store.dataSource[i]
-    if (menu.isEdit) {
-      editMenu = menu;
-      delete menu.isEdit;
-    }
-    while(++j < menu.children?.length) {
-      let subMenu = menu.children[j]
-      if (subMenu.isEdit) {
-        editMenu = subMenu;
-        delete subMenu.isEdit;
+/**
+ * @description 编辑菜单
+ * @param index 行号
+ */
+const onEdit = (menu: Menu) => {
+  store.editMenu = cloneDeep(menu);
+  if (menu) {
+    menu.isEdit = true;
+  }
+}
+
+/**
+ * @description 取消编辑
+ * @param index 行号
+ */
+const onCancelEdit = (index: number) => {
+  store.dataSource[index] = cloneDeep(store.editMenu)
+}
+
+
+/**
+ * @description 请求菜单数据
+ */
+const queryList = async () => {
+  const res = await $API.MENU.queryList<MenuModal>();
+  if (res.success && res.data.length) {
+    store.dataSource = res.data
+  }
+}
+
+const onSave = async (menu: Menu) => {
+  // update
+  if (menu.id) {
+
+  } else { // add
+    let i = -1;
+    let editMenu = undefined;
+    while(++i < store.dataSource.length) {
+      const menu = store.dataSource[i]
+      if (menu.isEdit) {
+        editMenu = menu;
+        delete menu.isEdit;
+        break;
+      }
+      let j = -1;
+      while(++j < menu.children?.length) {
+        let subMenu = menu.children[j]
+        if (subMenu.isEdit) {
+          editMenu = subMenu;
+          delete subMenu.isEdit;
+          break;
+        }
       }
     }
-    if (editMenu) break;
+    const res = await $API.MENU.create<any>(editMenu);
+    if (res.success) {
+      message.success('新增成功')
+      queryList()
+    }
   }
-  const res = await $API.MENU.create<any>(editMenu);
-  if (res.success) {
-    message.success('新增成功')
-    main()
-  }
+
 }
 
-main()
+queryList()
 const toggleAdvanced = () => {
   store.advanced = !store.advanced
 }
