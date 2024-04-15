@@ -1,6 +1,6 @@
-import type { MenuDTO, Menu } from './MenuModal'
+import { MenuModel, Menu } from './MenuModel';
 
 declare global {
-  type MenuModal = MenuDTO
-  type Menu = MenuInfo
+  type IMenu = Menu
+  type IMenuModel = MenuModel
 }

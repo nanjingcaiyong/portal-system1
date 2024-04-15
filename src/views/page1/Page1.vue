@@ -78,10 +78,10 @@
   </a-table>
 </template>
 <script lang="ts" setup>
-import { UnwrapRef, reactive } from 'vue';
+import { reactive } from 'vue';
 import {UpOutlined, DownOutlined, PlusOutlined, ExclamationCircleOutlined } from '@ant-design/icons-vue';
 import type { TableColumnType } from 'ant-design-vue';
-import { Menu, message } from 'ant-design-vue';
+import { message } from 'ant-design-vue';
 import columns from './columns';
 import moment from 'moment';
 import { cloneDeep } from 'lodash-es'
@@ -94,12 +94,12 @@ const defaultRow = {
   creator: ''
 }
 const store = reactive<{
-  dataSource: Menu[],
+  dataSource: IMenu[],
   advanced: boolean,
   columns: TableColumnType[],
   deleteModalState: boolean,
   expandedRowKeys: number[],
-  editMenu?: Menu
+  editMenu?: IMenu
 }>({
   advanced: false,
   columns: columns,
@@ -144,7 +144,7 @@ const onAddMenuItem = () => {
  * @description 新增子菜单
  * @param pid 系统id
  */
-const onAddSubMenuItem = (menu: Menu) => {
+const onAddSubMenuItem = (menu: IMenu) => {
   store.expandedRowKeys.push(menu.id);
   debugger;
   menu.children = menu.children || [];
@@ -155,7 +155,7 @@ const onAddSubMenuItem = (menu: Menu) => {
  * @description 删除菜单项
  * @param record 菜单数据
  */
-const onDeleteMenuItem = async (record: Menu) => {
+const onDeleteMenuItem = async (record: IMenu) => {
   const res = await $API.MENU.delete({id: record.id}) as any;
   if (res.success) {
     record.deleteModalState = false;
@@ -168,7 +168,7 @@ const onDeleteMenuItem = async (record: Menu) => {
  * @description 编辑菜单
  * @param index 行号
  */
-const onEdit = (menu: Menu) => {
+const onEdit = (menu: IMenu) => {
   store.editMenu = cloneDeep(menu);
   if (menu) {
     menu.isEdit = true;
@@ -188,13 +188,13 @@ const onCancelEdit = (index: number) => {
  * @description 请求菜单数据
  */
 const queryList = async () => {
-  const res = await $API.MENU.queryList<MenuModal>();
+  const res = await $API.MENU.queryList<IMenuModel>();
   if (res.success && res.data.length) {
     store.dataSource = res.data
   }
 }
 
-const onSave = async (menu: Menu) => {
+const onSave = async (menu: IMenu) => {
   // update
   if (menu.id) {
 
